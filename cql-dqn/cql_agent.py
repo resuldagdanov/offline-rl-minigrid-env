@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
-from network import DDQN, ConvDQN
+from network import ConvDQN
 
 
 class CQLAgent():

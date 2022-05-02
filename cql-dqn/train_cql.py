@@ -23,7 +23,7 @@ def get_config():
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--min_eps", type=float, default=0.01, help="Minimal Epsilon, default: 4")
     parser.add_argument("--eps_frames", type=int, default=1e3, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
-    parser.add_argument("--log_video", type=int, default=0, help="Log agent behaviour to wanbd when set to 1, default: 0")
+    parser.add_argument("--is_render", type=int, default=0, help="Render environment during training when set to 1, default: 0")
     parser.add_argument("--save_every", type=int, default=100, help="Saves the network every x epochs, default: 25")
     
     args = parser.parse_args()
@@ -34,7 +34,7 @@ def train(config):
     np.random.seed(config.seed)
     random.seed(config.seed)
     torch.manual_seed(config.seed)
-    print("config.env : ", config.env)
+
     env = gym.make(config.env)
     
     env.seed(config.seed)
@@ -42,7 +42,7 @@ def train(config):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
-    eps = 1.
+    eps = 1.0
     d_eps = 1 - config.min_eps
     steps = 0
     average10 = deque(maxlen=10)
@@ -58,10 +58,7 @@ def train(config):
         
         collect_random(env=env, dataset=buffer, num_samples=10000)
         
-        if config.log_video:
-            env = gym.wrappers.Monitor(env, './video', video_callable=lambda x: x%10==0, force=True)
-
-        for i in range(1, config.episodes+1):
+        for i in range(1, config.episodes + 1):
             state = env.reset()
             episode_steps = 0
             rewards = 0
@@ -79,6 +76,9 @@ def train(config):
                 state = next_state
                 rewards += reward
                 episode_steps += 1
+
+                if config.is_render:
+                    env.render()
                 
                 eps = max(1 - ((steps*d_eps)/config.eps_frames), config.min_eps)
                 
@@ -100,13 +100,6 @@ def train(config):
                        "Epsilon": eps,
                        "Episode": i,
                        "Buffer size": buffer.__len__()})
-
-            if (i %10 == 0) and config.log_video:
-                mp4list = glob.glob('video/*.mp4')
-                
-                if len(mp4list) > 1:
-                    mp4 = mp4list[-2]
-                    wandb.log({"gameplays": wandb.Video(mp4, caption='episode: '+str(i-10), fps=4, format="gif"), "Episode": i})
 
             if i % config.save_every == 0:
                 save(config, save_name="CQL-DQN", model=agent.network, wandb=wandb, ep=0)
