@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
-from networks import DDQN
+from network import DDQN
 
 
 class CQLAgent():
@@ -16,8 +16,8 @@ class CQLAgent():
         self.tau = 1e-3
         self.gamma = 0.99
         
-        self.network = DDQN(state_size=self.state_size, action_size=self.action_size, layer_size=hidden_size).to(self.device)
-        self.target_net = DDQN(state_size=self.state_size, action_size=self.action_size, layer_size=hidden_size).to(self.device)
+        self.network = DDQN(state_size=self.state_size, action_size=self.action_size, hidden_size=hidden_size).to(self.device)
+        self.target_net = DDQN(state_size=self.state_size, action_size=self.action_size, hidden_size=hidden_size).to(self.device)
 
         self.optimizer = optim.Adam(params=self.network.parameters(), lr=1e-3)
     
