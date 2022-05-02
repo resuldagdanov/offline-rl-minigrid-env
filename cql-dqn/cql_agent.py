@@ -9,6 +9,7 @@ from network import ConvDQN
 
 
 class CQLAgent():
+    
     def __init__(self, state_size, action_size, hidden_size=64, device="cpu"):
         self.state_size = state_size
         self.action_size = action_size
@@ -36,6 +37,17 @@ class CQLAgent():
         
         else:
             action = random.choices(np.arange(self.action_size), k=1)
+        
+        return action
+    
+    def get_greedy_action(self, state):
+        state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
+        self.network.eval()
+        
+        with torch.no_grad():
+            action_values = self.network(state)
+        
+        action = np.argmax(action_values.cpu().data.numpy(), axis=1)
         
         return action
         

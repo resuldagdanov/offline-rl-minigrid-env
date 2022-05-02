@@ -3,7 +3,6 @@ import gym_minigrid
 import random
 import pybullet_envs
 import numpy as np
-import glob
 import torch
 import wandb
 import argparse
@@ -16,7 +15,7 @@ from cql_agent import CQLAgent
 def get_config():
     parser = argparse.ArgumentParser(description='Offline-RL')
 
-    parser.add_argument("--run_name", type=str, default="CQL-DQN", help="Run name, default: CQL-DQN")
+    parser.add_argument("--run_name", type=str, default="cql-dqn", help="Run name, default: CQL-DQN")
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="Gym environment name, default: CartPole-v0")
     parser.add_argument("--episodes", type=int, default=300, help="Number of episodes, default: 200")
     parser.add_argument("--buffer_size", type=int, default=100_000, help="Maximal training dataset size, default: 100_000")
@@ -55,13 +54,16 @@ def train(config):
         wandb.watch(agent.network, log="gradients", log_freq=10)
 
         buffer = ReplayBuffer(buffer_size=config.buffer_size, batch_size=32, device=device)
-        
+
         collect_random(env=env, dataset=buffer, num_samples=10000)
+
+        best_eps_reward = 0.0
         
         for i in range(1, config.episodes + 1):
             state = env.reset()
+            
             episode_steps = 0
-            rewards = 0
+            rewards = 0.0
 
             while True:
                 action = agent.get_action(state['image'], epsilon=eps)
@@ -84,7 +86,7 @@ def train(config):
                 
                 if done:
                     break
-
+            
             average10.append(rewards)
             total_steps += episode_steps
             
@@ -102,7 +104,13 @@ def train(config):
                        "Buffer size": buffer.__len__()})
 
             if i % config.save_every == 0:
-                save(config, save_name="CQL-DQN", model=agent.network, wandb=wandb, ep=0)
+                save(config, save_name="mini-grid", model=agent.network, wandb=wandb, ep=str(i))
+            
+            if rewards > best_eps_reward:
+                best_eps_reward = rewards
+                
+                save(config, save_name="mini-grid", model=agent.network, wandb=wandb, ep=str(i) + "_best")
+                print("[Best Model is Saved at Episode {}]".format(i))
 
 
 if __name__ == "__main__":
