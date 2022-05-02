@@ -31,3 +31,19 @@ def collect_random(env, dataset, num_samples=200):
     
         if done:
             state = env.reset()
+
+
+def collect_from_model(env, agent, dataset, num_samples=100):
+    state = env.reset()
+    
+    for _ in range(num_samples):
+
+        action = agent.get_greedy_action(state['image'])
+        next_state, reward, done, _ = env.step(action)
+        
+        dataset.add(state['image'], action, reward, next_state['image'], done)
+        
+        state = next_state
+    
+        if done:
+            state = env.reset()

@@ -14,31 +14,32 @@ def get_config():
 
     parser.add_argument("--run_name", type=str, default="CQL-DQN", help="Run name, default: CQL-DQN")
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="Gym environment name, default: CartPole-v0")
-    parser.add_argument("--episodes", type=int, default=1, help="Number of episodes, default: 10")
+    parser.add_argument("--episodes", type=int, default=10, help="Number of episodes, default: 10")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--is_render", type=int, default=1, help="Render environment during training when set to 1, default: 1")
-    parser.add_argument("--model_path", type=str, default="./trained_models/cql-dqn_mini-grid_eps300.pth", help="Directory of the loaded model")
+    parser.add_argument("--model_path", type=str, default="./trained_models/cql-dqn_mini-grid_trained-agent_eps300.pth", help="Directory of the loaded model")
     
     args = parser.parse_args()
     return args
 
 
-def initialize(config):
+def set_seed(config, env):
     np.random.seed(config.seed)
     random.seed(config.seed)
     torch.manual_seed(config.seed)
-    
-    env = gym.make(config.env)
-    
+
     env.seed(config.seed)
     env.action_space.seed(config.seed)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    return env, device
+    gym.utils.seeding.np_random(config.seed)
 
 
 def evaluate(config):
-    env, device = initialize(config)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    env = gym.make(config.env)
+
+    # initialize with default seed
+    set_seed(config, env)
 
     steps = 0
     total_steps = 0
@@ -49,6 +50,11 @@ def evaluate(config):
     agent.network.eval()
 
     for i in range(1, config.episodes + 1):
+
+        # reset seeds in every episode so that the agent starts from a random states
+        config.seed = i
+        set_seed(config, env)
+
         state = env.reset()
         
         episode_steps = 0
@@ -73,7 +79,9 @@ def evaluate(config):
         average10.append(rewards)
         total_steps += episode_steps
         
-        print("Episode: {} | Reward: {} | Steps: {} | Total Steps: {}".format(i, rewards, steps, total_steps))
+        print("Episode: {} | Reward: {} | Steps: {}".format(i, rewards, steps))
+
+    env.close()
 
 
 if __name__ == "__main__":

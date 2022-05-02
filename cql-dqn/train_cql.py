@@ -8,8 +8,8 @@ import wandb
 import argparse
 from collections import deque
 from replay_buffer import ReplayBuffer
-from utils import save, collect_random
 from cql_agent import CQLAgent
+from utils import save, collect_random, collect_from_model
 
 
 def get_config():
@@ -24,6 +24,8 @@ def get_config():
     parser.add_argument("--eps_frames", type=int, default=1e3, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
     parser.add_argument("--is_render", type=int, default=0, help="Render environment during training when set to 1, default: 0")
     parser.add_argument("--save_every", type=int, default=100, help="Saves the network every x epochs, default: 25")
+    parser.add_argument("--model_path", type=str, default="./trained_models/cql-dqn_mini-grid_random-agent_eps300.pth", help="Directory of the loaded model")
+    parser.add_argument("--is_collect_from_model", type=int, default=1, help="Collect dataset from pre-trained agent model when set to 1, default: 0")
     
     args = parser.parse_args()
     return args
@@ -44,8 +46,8 @@ def train(config):
     eps = 1.0
     d_eps = 1 - config.min_eps
     steps = 0
-    average10 = deque(maxlen=10)
     total_steps = 0
+    average10 = deque(maxlen=10)
     
     with wandb.init(project="CQL", name=config.run_name, config=config):
 
@@ -55,7 +57,18 @@ def train(config):
 
         buffer = ReplayBuffer(buffer_size=config.buffer_size, batch_size=32, device=device)
 
-        collect_random(env=env, dataset=buffer, num_samples=10000)
+        # collect data by moving trained model
+        if config.is_collect_from_model:
+            agent.network.load_state_dict(torch.load(config.model_path))
+            agent.network.eval()
+
+            collect_from_model(env=env, agent=agent, dataset=buffer, num_samples=1000)
+            model_save_name = "mini-grid_trained-agent"
+        
+        # collect data by applying random actions
+        else:
+            collect_random(env=env, dataset=buffer, num_samples=10000)
+            model_save_name = "mini-grid_random-agent"
 
         best_eps_reward = 0.0
         
@@ -104,13 +117,13 @@ def train(config):
                        "Buffer size": buffer.__len__()})
 
             if i % config.save_every == 0:
-                save(config, save_name="mini-grid", model=agent.network, wandb=wandb, ep=str(i))
+                save(config, save_name=model_save_name, model=agent.network, wandb=wandb, ep=str(i))
             
             if rewards > best_eps_reward:
                 best_eps_reward = rewards
-                
-                save(config, save_name="mini-grid", model=agent.network, wandb=wandb, ep=str(i) + "_best")
-                print("[Best Model is Saved at Episode {}]".format(i))
+
+                save(config, save_name=model_save_name, model=agent.network, wandb=wandb, ep=str(i) + "_best")
+                print("-> Best Model is Saved at Episode {} !".format(i))
 
 
 if __name__ == "__main__":
