@@ -5,19 +5,20 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
-from network import DDQN
+from network import DDQN, ConvDQN
 
 
 class CQLAgent():
-    def __init__(self, state_size, action_size, hidden_size=256, device="cpu"):
+    def __init__(self, state_size, action_size, hidden_size=64, device="cpu"):
         self.state_size = state_size
         self.action_size = action_size
         self.device = device
+        
         self.tau = 1e-3
         self.gamma = 0.99
-        
-        self.network = DDQN(state_size=self.state_size, action_size=self.action_size, hidden_size=hidden_size).to(self.device)
-        self.target_net = DDQN(state_size=self.state_size, action_size=self.action_size, hidden_size=hidden_size).to(self.device)
+
+        self.network = ConvDQN(state_size=self.state_size, action_size=self.action_size, hidden_size=hidden_size).to(self.device)
+        self.target_net = ConvDQN(state_size=self.state_size, action_size=self.action_size, hidden_size=hidden_size).to(self.device)
 
         self.optimizer = optim.Adam(params=self.network.parameters(), lr=1e-3)
     
@@ -40,8 +41,9 @@ class CQLAgent():
         
     def learn(self, experiences):
         self.optimizer.zero_grad()
+
         states, actions, rewards, next_states, dones = experiences
-        
+
         with torch.no_grad():
             Q_targets_next = self.target_net(next_states).detach().max(1)[0].unsqueeze(1)
             Q_targets = rewards + (self.gamma * Q_targets_next * (1 - dones))

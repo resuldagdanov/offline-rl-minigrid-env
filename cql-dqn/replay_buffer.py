@@ -5,6 +5,7 @@ from collections import deque, namedtuple
 
 
 class ReplayBuffer:
+    
     def __init__(self, buffer_size, batch_size, device):
         self.device = device
         self.memory = deque(maxlen=buffer_size)  

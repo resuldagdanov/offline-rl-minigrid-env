@@ -1,21 +1,43 @@
-import torch
 import torch.nn as nn
 
 
-class DDQN(nn.Module):
+class ConvDQN(nn.Module):
+    
     def __init__(self, state_size, action_size, hidden_size):
-        super(DDQN, self).__init__()
+        super(ConvDQN, self).__init__()
 
-        self.input_shape = state_size
-        self.action_shape = action_size
-        
-        self.layer_1 = nn.Linear(self.input_shape[0], hidden_size)
-        self.layer_2 = nn.Linear(hidden_size, hidden_size)
-        self.layer_3 = nn.Linear(hidden_size, self.action_shape)
+        self.obs_space = state_size
+        self.action_space = action_size
 
-    def forward(self, _input):
-        out = torch.relu(self.layer_1(_input))
-        out = torch.relu(self.layer_2(out))
-        out = self.layer_3(out)
+        n = self.obs_space[0]
+        m = self.obs_space[1]
         
-        return out
+        self.image_embedding_size = ((n-1)//2-2)*((m-1)//2-2)*hidden_size
+
+        # define image embedding
+        self.image_convolution = nn.Sequential(
+            nn.Conv2d(3, 16, (2, 2)),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2)),
+            nn.Conv2d(16, 32, (2, 2)),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, (2, 2)),
+            nn.ReLU()
+        )
+
+        self.mlp = nn.Sequential(
+            nn.Linear(self.image_embedding_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, self.action_space)
+        )
+
+    def forward(self, obs):
+        out = obs.transpose(1, 3).transpose(2, 3)
+        
+        out = self.image_convolution(out)
+
+        embeding = out.reshape(out.shape[0], -1)
+
+        logit = self.mlp(embeding)
+
+        return logit

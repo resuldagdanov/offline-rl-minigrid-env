@@ -1,4 +1,5 @@
 import gym
+import gym_minigrid
 import random
 import pybullet_envs
 import numpy as np
@@ -48,8 +49,8 @@ def train(config):
     total_steps = 0
     
     with wandb.init(project="CQL", name=config.run_name, config=config):
-        
-        agent = CQLAgent(state_size=env.observation_space.shape, action_size=env.action_space.n, device=device)
+
+        agent = CQLAgent(state_size=env.observation_space['image'].shape, action_size=env.action_space.n, device=device)
 
         wandb.watch(agent.network, log="gradients", log_freq=10)
 
@@ -66,11 +67,13 @@ def train(config):
             rewards = 0
 
             while True:
-                action = agent.get_action(state, epsilon=eps)
+                action = agent.get_action(state['image'], epsilon=eps)
                 steps += 1
                 
                 next_state, reward, done, _ = env.step(action[0])
-                buffer.add(state, action, reward, next_state, done)
+
+                buffer.add(state['image'], action, reward, next_state['image'], done)
+
                 loss, cql_loss, bellmann_error = agent.learn(buffer.sample())
                 
                 state = next_state
