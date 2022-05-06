@@ -25,24 +25,34 @@ def get_config():
     parser.add_argument("--is_render", type=int, default=0, help="Render environment during training when set to 1, default: 0")
     parser.add_argument("--save_every", type=int, default=100, help="Saves the network every x epochs, default: 25")
     parser.add_argument("--model_path", type=str, default="./trained_models/cql-dqn_mini-grid_random-agent_eps300.pth", help="Directory of the loaded model")
-    parser.add_argument("--is_collect_from_model", type=int, default=1, help="Collect dataset from pre-trained agent model when set to 1, default: 0")
+    parser.add_argument("--is_collect_from_model", type=int, default=0, help="Collect dataset from pre-trained agent model when set to 1, default: 0")
     
     args = parser.parse_args()
     return args
 
 
-def train(config):
+def make_env(config):
     np.random.seed(config.seed)
     random.seed(config.seed)
     torch.manual_seed(config.seed)
+    
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(config.seed)
 
     env = gym.make(config.env)
     
     env.seed(config.seed)
     env.action_space.seed(config.seed)
 
+    return env
+
+
+def train(config):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    
+
+    # create environmenty and assign seeds
+    env = make_env(config)
+
     eps = 1.0
     d_eps = 1 - config.min_eps
     steps = 0
