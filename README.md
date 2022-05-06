@@ -7,7 +7,7 @@ Implementation of Offline Reinforcement Learning in Gym Mini-Grid Environment
 * Original Conservative Q-Learning (CQL) [paper](https://arxiv.org/pdf/2006.04779.pdf).
 
 ## Installation
-First, gym-ninigrid environment has to be installed.
+First, gym-minigrid environment has to be installed.
 ```
 pip3 install gym-minigrid
 ```
