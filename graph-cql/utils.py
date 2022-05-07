@@ -4,6 +4,7 @@ import random
 import torch
 import gym
 import pickle
+import copy
 
 
 def create_config():
@@ -28,7 +29,7 @@ def collect_transitions(env, dataset, experience, num_steps):
         action = env.action_space.sample()
         next_state, reward, done, _ = env.step(action)
         
-        exp = experience(state['image'], action, reward, next_state['image'], done)
+        exp = experience(list(state['image']), action, reward, list(next_state['image']), done)
         dataset.append(exp._asdict())
 
         state = next_state
@@ -66,5 +67,23 @@ def open_dataset():
     return data
 
 
-def create_graph():
-    pass
+def make_hash(o):
+
+  """
+  Makes a hash from a dictionary, list, tuple or set to any level, that contains
+  only other hashable types (including any lists, tuples, sets, and
+  dictionaries).
+  """
+
+  if isinstance(o, (set, tuple, list)):
+    return tuple([make_hash(e) for e in o])    
+
+  elif not isinstance(o, dict):
+    return hash(o)
+
+  new_o = copy.deepcopy(o)
+  
+  for k, v in new_o.items():
+    new_o[k] = make_hash(v)
+
+  return hash(tuple(frozenset(sorted(new_o.items()))))

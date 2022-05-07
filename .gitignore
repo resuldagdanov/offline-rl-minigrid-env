@@ -131,6 +131,8 @@ dmypy.json
 *.json
 *.wandb
 *.yaml
+*.pkl
+*.pickle
 
 cql-dqn/wandb/
 cql-dqn/trained_models/
