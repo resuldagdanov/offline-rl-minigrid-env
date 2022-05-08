@@ -67,23 +67,33 @@ def open_dataset():
     return data
 
 
-def make_hash(o):
+def sample_from_bfs(tree_edges, hash_table, batch_size, device):
+    states, actions, rewards, next_states, dones = [], [], [], [], []
 
-  """
-  Makes a hash from a dictionary, list, tuple or set to any level, that contains
-  only other hashable types (including any lists, tuples, sets, and
-  dictionaries).
-  """
+    # randomly pop indices and remove edges from the tree list
+    random_indices = np.random.choice(a=range(0, len(tree_edges)), size=batch_size, replace=False)
+    poped_edges = np.take(a=tree_edges, indices=random_indices, axis=0)
+    tree_edges = np.delete(arr=tree_edges, obj=random_indices, axis=0)
 
-  if isinstance(o, (set, tuple, list)):
-    return tuple([make_hash(e) for e in o])    
+    # as each edge stores a value of transition, look up to hash-table
+    for edge in poped_edges:
+        current_state_hash = edge[0]
+        next_state_hash = edge[1]
 
-  elif not isinstance(o, dict):
-    return hash(o)
+        # transition of this edge is stored within the current state hash
+        flatten_state, transition = hash_table.get_with_key(hash_key=current_state_hash)
 
-  new_o = copy.deepcopy(o)
-  
-  for k, v in new_o.items():
-    new_o[k] = make_hash(v)
+        states.append(transition['state'])
+        actions.append(transition['action'])
+        rewards.append(transition['reward'])
+        next_states.append(transition['next_state'])
+        dones.append(transition['done'])
 
-  return hash(tuple(frozenset(sorted(new_o.items()))))
+    # convert lists of batch samples to torch device tensor
+    states = torch.from_numpy(np.array(states)).float().to(device)
+    actions = torch.from_numpy(np.array(actions)).float().to(device)
+    rewards = torch.from_numpy(np.array(rewards)).float().to(device)
+    next_states = torch.from_numpy(np.array(next_states)).float().to(device)
+    dones = torch.from_numpy(np.array(dones)).float().to(device)
+
+    return tree_edges, (states, actions, rewards, next_states, dones)

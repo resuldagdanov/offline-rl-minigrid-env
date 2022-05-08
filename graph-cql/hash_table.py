@@ -3,24 +3,29 @@ import numpy as np
 
 class HashTable(object):
 
-    def __init__(self, buffer_size: int):
+    def __init__(self, buffer_size: int) -> None:
         # initiate our buffer with empty transitions
         self.buffer = [None] * buffer_size
 
-    def __setitem__(self, state: tuple, transition: np.ndarray):
+    def __setitem__(self, state: tuple, transition: np.ndarray) -> None:
         # state: concatted flattened state tuple
         # transition: numpy array of (state, action, next_state, reward, terminal)
         self.add(state, transition)
     
-    def __getitem__(self, state: tuple):
+    def __getitem__(self, state: tuple) -> np.ndarray:
         # retreats transition of this state hash key
         return self.get(state)
     
-    def hash(self, state: tuple):
+    def hash(self, state: tuple) -> int:
         # get the index of our array for a specific string key
         return hash(state) % len(self.buffer)
-        
-    def add(self, state: tuple, transition: np.ndarray):
+    
+    def get_with_key(self, hash_key: int) -> np.ndarray:
+        # queue transition when hash key is given
+        index = hash_key % len(self.buffer)
+        return self.buffer[index][0]
+    
+    def add(self, state: tuple, transition: np.ndarray) -> None:
         # add a value to our array by its key
         index_key = self.hash(state)
 
@@ -43,7 +48,7 @@ class HashTable(object):
             self.buffer[index_key] = []
             self.buffer[index_key].append([state, transition])
     
-    def get(self, state: tuple):
+    def get(self, state: tuple) -> np.ndarray:
         # get a value by key
         index_key = self.hash(state)
 
@@ -63,7 +68,7 @@ class HashTable(object):
         # if no return was done during loop, it means key didn't exist
         raise KeyError()
         
-    def is_full(self):
+    def is_full(self) -> bool:
         # determines if the hash-table is too populated
         items = 0
 
@@ -75,7 +80,7 @@ class HashTable(object):
         # return bool value based on if the amount of populated items are more than half the length of the list
         return items > len(self.buffer) / 2
     
-    def double(self):
+    def double(self) -> None:
         # double the list length and re-add values
         ht2 = HashTable(buffer_size=len(self.buffer)*2)
 

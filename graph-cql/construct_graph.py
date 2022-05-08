@@ -3,9 +3,12 @@ import utils
 import numpy as np
 import matplotlib.pyplot as plt
 from hash_table import HashTable
+from utils import sample_from_bfs
 
 
 def build_graph(graph, buffer_data):
+    # breadth-first-search trees
+    trees = []
 
     # loop through each transition and store in the graph
     for idx, transition in enumerate(buffer_data):
@@ -17,9 +20,11 @@ def build_graph(graph, buffer_data):
 
         # store the terminal state so that from there, start bfs algorithm
         if done:
-            last_state = state
+            terminal_state = state
 
-        # print("\nstate : ", np.reshape(state.flatten(), (7, 7, 3)), state.shape)
+            # apply reverse breadth-first-search and create an oriented tree
+            bfs = networkx.bfs_tree(G=graph, source=hash(tuple(terminal_state)), reverse=True)
+            trees.append(bfs)
 
         # concatenate states in one transition; used to differentiate different edges NOTE: check usage
         current_next = np.concatenate((state, next_state))
@@ -29,11 +34,8 @@ def build_graph(graph, buffer_data):
 
         # graph.add_edge(idx, idx + 1)#, weight=reward)
         graph.add_edge(hash(tuple(state)), hash(tuple(next_state)))
-    
-    # apply reverse breadth-first-search and create an oriented tree
-    bfs = networkx.bfs_tree(G=graph, source=hash(tuple(last_state)), reverse=True)
 
-    return graph, bfs
+    return graph, trees
 
 
 def plot_graph(G):
@@ -59,10 +61,14 @@ if __name__ == "__main__":
     table = HashTable(buffer_size=len(replay_buffer))
 
     # create graph with hash-table
-    graph, bfs = build_graph(graph=graph, buffer_data=replay_buffer)
+    graph, bfs_trees = build_graph(graph=graph, buffer_data=replay_buffer)
 
-    print("graph: ", len(graph.edges()))
+    # plot_graph(G=graph)
 
-    print("bfs : ", len(bfs.edges()))
+    # get all stored edges
+    tree_edges = bfs_trees[0].edges()
 
-    plot_graph(G=bfs)
+    # randomly pop transitions from graph and remove it from tree
+    tree_edges, batch_transitions = sample_from_bfs(tree_edges=tree_edges, hash_table=table, batch_size=4, device='cpu')
+
+    print("batch_transitions : ", batch_transitions)
