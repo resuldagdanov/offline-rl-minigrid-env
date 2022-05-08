@@ -11,7 +11,7 @@ def create_config():
     parser = argparse.ArgumentParser(description='Offline-RL')
 
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="Gym environment name, default: CartPole-v0")
-    parser.add_argument("--num_steps", type=int, default=100, help="Number of steps to be collected, default: 200")
+    parser.add_argument("--num_steps", type=int, default=1000, help="Number of steps to be collected, default: 200")
     parser.add_argument("--buffer_size", type=int, default=1_000, help="Maximal training dataset size, default: 100_000")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--eps_frames", type=int, default=1e3, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")

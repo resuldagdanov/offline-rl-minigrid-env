@@ -8,7 +8,7 @@ class HashTable(object):
         self.buffer = [None] * buffer_size
 
     def __setitem__(self, state: tuple, transition: np.ndarray):
-        # state: concatted flattened state + next state tuples
+        # state: concatted flattened state tuple
         # transition: numpy array of (state, action, next_state, reward, terminal)
         self.add(state, transition)
     
