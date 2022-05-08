@@ -29,7 +29,7 @@ def collect_transitions(env, dataset, experience, num_steps):
         action = env.action_space.sample()
         next_state, reward, done, _ = env.step(action)
         
-        exp = experience(list(state['image']), action, reward, list(next_state['image']), done)
+        exp = experience(state['image'], action, reward, next_state['image'], done)
         dataset.append(exp._asdict())
 
         state = next_state
