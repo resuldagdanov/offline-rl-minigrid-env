@@ -133,6 +133,7 @@ dmypy.json
 *.yaml
 *.pkl
 *.pickle
+*.pth
 
-cql-dqn/wandb/
-cql-dqn/trained_models/
+cql_dqn/wandb/
+cql_dqn/trained_models/

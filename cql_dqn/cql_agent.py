@@ -1,3 +1,5 @@
+import os
+import sys
 import random
 import numpy as np
 import torch
@@ -5,7 +7,13 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
-from network import ConvDQN
+
+# to add the parent "agents" folder to sys path and import models
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
+
+from cql_dqn.network import ConvDQN
 
 
 class CQLAgent():

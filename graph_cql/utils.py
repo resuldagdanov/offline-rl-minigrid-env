@@ -11,10 +11,9 @@ def create_config():
     parser = argparse.ArgumentParser(description='Offline-RL')
 
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="Gym environment name, default: CartPole-v0")
-    parser.add_argument("--num_steps", type=int, default=1000, help="Number of steps to be collected, default: 200")
-    parser.add_argument("--buffer_size", type=int, default=1_000, help="Maximal training dataset size, default: 100_000")
+    parser.add_argument("--num_steps", type=int, default=10000, help="Number of steps to be collected, default: 200")
+    parser.add_argument("--buffer_size", type=int, default=1000, help="Maximal training dataset size, default: 100_000")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
-    parser.add_argument("--eps_frames", type=int, default=1e3, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
     parser.add_argument("--is_render", type=int, default=0, help="Render environment during training when set to 1, default: 0")
     
     args = parser.parse_args()
@@ -88,10 +87,11 @@ def sample_from_bfs(tree_edges, hash_table, batch_size, device):
         rewards.append(transition['reward'])
         next_states.append(transition['next_state'])
         dones.append(transition['done'])
-
+    
     # convert lists of batch samples to torch device tensor
     states = torch.from_numpy(np.array(states)).float().to(device)
     actions = torch.from_numpy(np.array(actions)).float().to(device)
+    actions = actions.type(torch.int64).unsqueeze(1)
     rewards = torch.from_numpy(np.array(rewards)).float().to(device)
     next_states = torch.from_numpy(np.array(next_states)).float().to(device)
     dones = torch.from_numpy(np.array(dones)).float().to(device)

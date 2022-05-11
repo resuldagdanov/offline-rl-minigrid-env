@@ -6,7 +6,7 @@ from hash_table import HashTable
 from utils import sample_from_bfs
 
 
-def build_graph(graph, buffer_data):
+def build_graph(graph, buffer_data, table):
     # breadth-first-search trees
     trees = []
 
@@ -61,9 +61,9 @@ if __name__ == "__main__":
     table = HashTable(buffer_size=len(replay_buffer))
 
     # create graph with hash-table
-    graph, bfs_trees = build_graph(graph=graph, buffer_data=replay_buffer)
+    graph, bfs_trees = build_graph(graph=graph, buffer_data=replay_buffer, table=table)
 
-    # plot_graph(G=graph)
+    plot_graph(G=graph)
 
     # get all stored edges
     tree_edges = bfs_trees[0].edges()

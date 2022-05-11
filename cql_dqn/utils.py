@@ -33,7 +33,7 @@ def collect_random(env, dataset, num_samples=200):
             state = env.reset()
 
 
-def collect_from_model(env, agent, dataset, num_samples=100):
+def collect_from_model(env, agent, dataset, num_samples=1000):
     state = env.reset()
     
     for _ in range(num_samples):
