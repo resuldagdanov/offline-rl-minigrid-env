@@ -11,8 +11,8 @@ def create_config():
     parser = argparse.ArgumentParser(description='Offline-RL')
 
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="Gym environment name, default: CartPole-v0")
-    parser.add_argument("--num_steps", type=int, default=10000, help="Number of steps to be collected, default: 200")
-    parser.add_argument("--buffer_size", type=int, default=1000, help="Maximal training dataset size, default: 100_000")
+    parser.add_argument("--num_steps", type=int, default=10_000, help="Number of steps to be collected, default: 200")
+    parser.add_argument("--buffer_size", type=int, default=10_000, help="Maximal training dataset size, default: 100_000")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--is_render", type=int, default=0, help="Render environment during training when set to 1, default: 0")
     
@@ -27,7 +27,7 @@ def collect_transitions(env, dataset, experience, num_steps):
 
         action = env.action_space.sample()
         next_state, reward, done, _ = env.step(action)
-        
+
         exp = experience(state['image'], action, reward, next_state['image'], done)
         dataset.append(exp._asdict())
 
@@ -69,10 +69,18 @@ def open_dataset():
 def sample_from_bfs(tree_edges, hash_table, batch_size, device):
     states, actions, rewards, next_states, dones = [], [], [], [], []
 
+    # print("1 len(tree_edges) : ", len(tree_edges))
+
     # randomly pop indices and remove edges from the tree list
     random_indices = np.random.choice(a=range(0, len(tree_edges)), size=batch_size, replace=False)
     poped_edges = np.take(a=tree_edges, indices=random_indices, axis=0)
+    # TODO: check original TER paper whether to remove edges from the tree list or not
     tree_edges = np.delete(arr=tree_edges, obj=random_indices, axis=0)
+
+    # print("random_indices : ", random_indices)
+    # print("poped_edges : ", poped_edges)
+    # print("tree_edges : ", tree_edges)
+    # print("2 len(tree_edges) : ", len(tree_edges))
 
     # as each edge stores a value of transition, look up to hash-table
     for edge in poped_edges:
@@ -81,6 +89,9 @@ def sample_from_bfs(tree_edges, hash_table, batch_size, device):
 
         # transition of this edge is stored within the current state hash
         flatten_state, transition = hash_table.get_with_key(hash_key=current_state_hash)
+
+        # if transition['reward'] != 0:
+        #     print("transition : ", transition['done'], transition['reward'])
 
         states.append(transition['state'])
         actions.append(transition['action'])

@@ -18,7 +18,8 @@ def get_config():
     parser.add_argument("--run_name", type=str, default="cql-dqn", help="Run name, default: CQL-DQN")
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="Gym environment name, default: CartPole-v0")
     parser.add_argument("--episodes", type=int, default=300, help="Number of episodes, default: 200")
-    parser.add_argument("--buffer_size", type=int, default=100_000, help="Maximal training dataset size, default: 100_000")
+    parser.add_argument("--buffer_size", type=int, default=10_000, help="Maximal training dataset size, default: 100_000")
+    parser.add_argument("--num_samples", type=int, default=10_000, help="Number of samples to collect, default: 100_000")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--min_eps", type=float, default=0.01, help="Minimal Epsilon, default: 4")
     parser.add_argument("--eps_frames", type=int, default=1e3, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
@@ -72,12 +73,12 @@ def train(config):
             agent.network.load_state_dict(torch.load(config.model_path))
             agent.network.eval()
 
-            collect_from_model(env=env, agent=agent, dataset=buffer, num_samples=1000)
+            collect_from_model(env=env, agent=agent, dataset=buffer, num_samples=config.num_samples)
             model_save_name = "mini-grid_trained-agent"
         
         # collect data by applying random actions
         else:
-            collect_random(env=env, dataset=buffer, num_samples=10000)
+            collect_random(env=env, dataset=buffer, num_samples=config.num_samples)
             model_save_name = "mini-grid_random-agent"
 
         best_eps_reward = 0.0
@@ -94,7 +95,8 @@ def train(config):
                 
                 next_state, reward, done, _ = env.step(action[0])
 
-                buffer.add(state['image'], action, reward, next_state['image'], done)
+                # TODO: remove adding to buffer as CQL is static dataset training
+                # buffer.add(state['image'], action, reward, next_state['image'], done)
 
                 loss, cql_loss, bellmann_error = agent.learn(buffer.sample())
                 

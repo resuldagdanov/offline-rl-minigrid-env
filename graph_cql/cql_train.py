@@ -27,7 +27,7 @@ def get_config():
     parser.add_argument("--run_name", type=str, default="cql-dqn", help="Run name, default: CQL-DQN")
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="Gym environment name, default: CartPole-v0")
     parser.add_argument("--episodes", type=int, default=300, help="Number of episodes, default: 200")
-    parser.add_argument("--buffer_size", type=int, default=100_000, help="Maximal training dataset size, default: 100_000")
+    parser.add_argument("--buffer_size", type=int, default=10_000, help="Maximal training dataset size, default: 100_000")
     parser.add_argument("--batch_size", type=int, default=32, help="Mini batch size, default: 32")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--min_eps", type=float, default=0.01, help="Minimal Epsilon, default: 4")
@@ -66,6 +66,9 @@ def train():
     d_eps = 1 - config.min_eps
     average10 = deque(maxlen=10)
 
+    # get all stored edges
+    tree_edges = bfs_trees[k_tree].edges()
+
     for i in range(1, config.episodes + 1):
         state = env.reset()
         
@@ -73,31 +76,31 @@ def train():
         rewards = 0.0
 
         while True:
-            # get all stored edges
-            tree_edges = bfs_trees[k_tree].edges()
 
             if len(tree_edges) < 32:
-                print("Tree edges:", len(tree_edges))
+                # print("Tree edges:", k_tree, len(tree_edges))
                 k_tree += 1
+
+                # when maximum number of trees is reached, break the loop
+                if k_tree == len(bfs_trees):
+                    # print("Maximum number of trees reached !")
+                    # return
+                    k_tree = 0
+
+                # get all stored edges
+                tree_edges = bfs_trees[k_tree].edges()
                 continue
-            
-            # when maximum number of trees is reached, break the loop
-            if k_tree == len(bfs_trees):
-                print("Maximum number of trees reached !")
-                return
             
             action = agent.get_action(state['image'], epsilon=eps)
             steps += 1
-            
+
             next_state, reward, done, _ = env.step(action[0])
             
             # randomly pop transitions from graph and remove it from tree
             tree_edges, batch_transitions = utils.sample_from_bfs(tree_edges=tree_edges, hash_table=table, batch_size=32, device=device)
 
-            # print("batch_transitions : ", batch_transitions)
-
             loss, cql_loss, bellmann_error = agent.learn(batch_transitions)
-            
+
             state = next_state
             rewards += reward
             episode_steps += 1
@@ -142,5 +145,8 @@ if __name__ == "__main__":
 
     # create graph with hash-table
     graph, bfs_trees = build_graph(graph=graph, buffer_data=replay_buffer, table=table)
+
+    print("graph : ", graph)
+    print("bfs_trees : ", bfs_trees, len(bfs_trees))
 
     train()

@@ -70,5 +70,3 @@ if __name__ == "__main__":
 
     # randomly pop transitions from graph and remove it from tree
     tree_edges, batch_transitions = sample_from_bfs(tree_edges=tree_edges, hash_table=table, batch_size=4, device='cpu')
-
-    print("batch_transitions : ", batch_transitions)
