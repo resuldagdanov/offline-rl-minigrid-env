@@ -19,10 +19,11 @@ def get_config():
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="Gym environment name, default: CartPole-v0")
     parser.add_argument("--episodes", type=int, default=300, help="Number of episodes, default: 200")
     parser.add_argument("--buffer_size", type=int, default=10_000, help="Maximal training dataset size, default: 100_000")
+    parser.add_argument("--batch_size", type=int, default=32, help="Mini batch size, default: 32")
     parser.add_argument("--num_samples", type=int, default=10_000, help="Number of samples to collect, default: 100_000")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
-    parser.add_argument("--min_eps", type=float, default=0.01, help="Minimal Epsilon, default: 4")
-    parser.add_argument("--eps_frames", type=int, default=1e3, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
+    parser.add_argument("--min_eps", type=float, default=0.01, help="Minimal Epsilon, default: 0.01")
+    parser.add_argument("--eps_frames", type=int, default=1e-5, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
     parser.add_argument("--is_render", type=int, default=0, help="Render environment during training when set to 1, default: 0")
     parser.add_argument("--save_every", type=int, default=100, help="Saves the network every x epochs, default: 25")
     parser.add_argument("--model_path", type=str, default="./trained_models/cql-dqn_mini-grid_random-agent_eps300.pth", help="Directory of the loaded model")
@@ -66,7 +67,7 @@ def train(config):
 
         wandb.watch(agent.network, log="gradients", log_freq=10)
 
-        buffer = ReplayBuffer(buffer_size=config.buffer_size, batch_size=32, device=device)
+        buffer = ReplayBuffer(buffer_size=config.buffer_size, batch_size=config.batch_size, device=device)
 
         # collect data by moving trained model
         if config.is_collect_from_model:
@@ -98,7 +99,8 @@ def train(config):
                 # TODO: remove adding to buffer as CQL is static dataset training
                 # buffer.add(state['image'], action, reward, next_state['image'], done)
 
-                loss, cql_loss, bellmann_error = agent.learn(buffer.sample())
+                batch_transitions = buffer.sample()
+                loss, cql_loss, bellmann_error = agent.learn(batch_transitions)
                 
                 state = next_state
                 rewards += reward

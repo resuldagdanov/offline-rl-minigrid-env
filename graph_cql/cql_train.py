@@ -30,8 +30,8 @@ def get_config():
     parser.add_argument("--buffer_size", type=int, default=10_000, help="Maximal training dataset size, default: 100_000")
     parser.add_argument("--batch_size", type=int, default=32, help="Mini batch size, default: 32")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
-    parser.add_argument("--min_eps", type=float, default=0.01, help="Minimal Epsilon, default: 4")
-    parser.add_argument("--eps_frames", type=int, default=1e3, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
+    parser.add_argument("--min_eps", type=float, default=0.01, help="Minimal Epsilon, default: 0.01")
+    parser.add_argument("--eps_frames", type=int, default=1e-5, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
     parser.add_argument("--is_render", type=int, default=0, help="Render environment during training when set to 1, default: 0")
     parser.add_argument("--save_every", type=int, default=100, help="Saves the network every x epochs, default: 25")
     parser.add_argument("--model_path", type=str, default="./trained_models/cql-dqn_mini-grid_random-agent_eps300.pth", help="Directory of the loaded model")
@@ -77,7 +77,7 @@ def train():
 
         while True:
 
-            if len(tree_edges) < 32:
+            if len(tree_edges) < config.batch_size:
                 # print("Tree edges:", k_tree, len(tree_edges))
                 k_tree += 1
 
@@ -97,7 +97,7 @@ def train():
             next_state, reward, done, _ = env.step(action[0])
             
             # randomly pop transitions from graph and remove it from tree
-            tree_edges, batch_transitions = utils.sample_from_bfs(tree_edges=tree_edges, hash_table=table, batch_size=32, device=device)
+            tree_edges, batch_transitions = utils.sample_from_bfs(tree_edges=tree_edges, hash_table=table, batch_size=config.batch_size, device=device)
 
             loss, cql_loss, bellmann_error = agent.learn(batch_transitions)
 
