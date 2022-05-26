@@ -70,7 +70,7 @@ class CQLAgent():
         
         Q_a_s = self.network(states)
         Q_expected = Q_a_s.gather(1, actions)
-        
+
         cql1_loss = torch.logsumexp(Q_a_s, dim=1).mean() - Q_a_s.mean()
 
         bellmann_error = F.mse_loss(Q_expected, Q_targets)
@@ -82,9 +82,6 @@ class CQLAgent():
         clip_grad_norm_(self.network.parameters(), 1)
 
         self.optimizer.step()
-
-        # ------------------- update target network ------------------- #
-        self.soft_update(self.network, self.target_net)
         
         return q1_loss.detach().item(), cql1_loss.detach().item(), bellmann_error.detach().item()
 

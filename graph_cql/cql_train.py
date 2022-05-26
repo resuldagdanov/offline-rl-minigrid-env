@@ -101,6 +101,10 @@ def train():
 
             loss, cql_loss, bellmann_error = agent.learn(batch_transitions)
 
+            # ------------------- update target network ------------------- #
+            # TODO: update target network every x steps
+            agent.soft_update(agent.network, agent.target_net)
+
             state = next_state
             rewards += reward
             episode_steps += 1
