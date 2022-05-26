@@ -94,8 +94,8 @@ def sample_from_bfs(tree_edges, hash_table, batch_size, device):
     states = torch.from_numpy(np.array(states)).float().to(device)
     actions = torch.from_numpy(np.array(actions)).float().to(device)
     actions = actions.type(torch.int64).unsqueeze(1)
-    rewards = torch.from_numpy(np.array(rewards)).float().to(device)
+    rewards = torch.from_numpy(np.reshape(rewards, (len(rewards), 1))).float().to(device)
     next_states = torch.from_numpy(np.array(next_states)).float().to(device)
-    dones = torch.from_numpy(np.array(dones)).float().to(device)
+    dones = torch.from_numpy(np.reshape(dones, (len(dones), 1))).float().to(device)
 
     return tree_edges, (states, actions, rewards, next_states, dones)
