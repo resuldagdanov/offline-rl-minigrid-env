@@ -31,7 +31,7 @@ def get_config():
     parser.add_argument("--batch_size", type=int, default=32, help="Mini batch size, default: 32")
     parser.add_argument("--seed", type=int, default=1, help="Seed, default: 1")
     parser.add_argument("--min_eps", type=float, default=0.01, help="Minimal Epsilon, default: 0.01")
-    parser.add_argument("--eps_frames", type=int, default=1e-5, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
+    parser.add_argument("--eps_frames", type=int, default=1e3, help="Number of steps for annealing the epsilon value to the min epsilon, default: 1e-5")
     parser.add_argument("--is_render", type=int, default=0, help="Render environment during training when set to 1, default: 0")
     parser.add_argument("--save_every", type=int, default=100, help="Saves the network every x epochs, default: 25")
     parser.add_argument("--model_path", type=str, default="./trained_models/cql-dqn_mini-grid_random-agent_eps300.pth", help="Directory of the loaded model")
@@ -57,17 +57,16 @@ def make_env():
     return env
 
 
-def train():
+def train(bfs_tree):
     eps = 1.0
     steps = 0
-    k_tree = 0
     total_steps = 0
     best_eps_reward = 0.0
     d_eps = 1 - config.min_eps
     average10 = deque(maxlen=10)
 
     # get all stored edges
-    tree_edges = bfs_trees[k_tree].edges()
+    tree_edges = bfs_tree.edges()
 
     for i in range(1, config.episodes + 1):
         state = env.reset()
@@ -76,33 +75,18 @@ def train():
         rewards = 0.0
 
         while True:
-
-            if len(tree_edges) < config.batch_size:
-                # print("Tree edges:", k_tree, len(tree_edges))
-                k_tree += 1
-
-                # when maximum number of trees is reached, break the loop
-                if k_tree == len(bfs_trees):
-                    # print("Maximum number of trees reached !")
-                    # return
-                    k_tree = 0
-
-                # get all stored edges
-                tree_edges = bfs_trees[k_tree].edges()
-                continue
-            
             action = agent.get_action(state['image'], epsilon=eps)
             steps += 1
 
             next_state, reward, done, _ = env.step(action[0])
             
             # randomly pop transitions from graph and remove it from tree
-            tree_edges, batch_transitions = utils.sample_from_bfs(tree_edges=tree_edges, hash_table=table, batch_size=config.batch_size, device=device)
+            batch_transitions = utils.sample_from_bfs(tree_edges=tree_edges, hash_table=table, batch_size=config.batch_size, device=device)
 
             loss, cql_loss, bellmann_error = agent.learn(batch_transitions)
 
-            # ------------------- update target network ------------------- #
             # TODO: update target network every x steps
+            # update target network
             agent.soft_update(agent.network, agent.target_net)
 
             state = next_state
@@ -120,7 +104,7 @@ def train():
         average10.append(rewards)
         total_steps += episode_steps
         
-        print("Episode: {} | Reward: {} | Q Loss: {} | Steps: {}".format(i, rewards, loss, steps,))
+        print("Episode: {} | Reward: {} | Q Loss: {} | CQL Loss: {} | Bellman Error: {} | Steps: {} | Epsilon: {}".format(i, rewards, loss, cql_loss, bellmann_error, steps, eps))
 
         if rewards > best_eps_reward:
             best_eps_reward = rewards
@@ -148,9 +132,10 @@ if __name__ == "__main__":
     agent = CQLAgent(state_size=env.observation_space['image'].shape, action_size=env.action_space.n, device=device)
 
     # create graph with hash-table
-    graph, bfs_trees = build_graph(graph=graph, buffer_data=replay_buffer, table=table)
+    graph, bfs_tree, table = build_graph(graph=graph, buffer_data=replay_buffer, table=table)
 
-    print("graph : ", graph)
-    print("bfs_trees : ", bfs_trees, len(bfs_trees))
-
-    train()
+    # save deep copy of the buffer for regenerating memory
+    table.save_buffer()
+    
+    # initialize training
+    train(bfs_tree)

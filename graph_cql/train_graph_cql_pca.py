@@ -204,7 +204,7 @@ def train(bfs_tree):
         average10.append(rewards)
         total_steps += episode_steps
         
-        print("Episode: {} | Reward: {} | Q Loss: {} | Steps: {} | Epsilon: {}".format(i, rewards, loss, steps, eps))
+        print("Episode: {} | Reward: {} | Q Loss: {} | CQL Loss: {} | Bellman Error: {} | Steps: {} | Epsilon: {}".format(i, rewards, loss, cql_loss, bellmann_error, steps, eps))
 
         if rewards > best_eps_reward:
             best_eps_reward = rewards
