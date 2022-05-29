@@ -4,7 +4,6 @@ import random
 import torch
 import gym
 import pickle
-import copy
 
 
 def create_config():
@@ -66,23 +65,42 @@ def open_dataset():
     return data
 
 
+def state2hash(state):
+    return hash(tuple(state))
+
+
 def sample_from_bfs(tree_edges, hash_table, batch_size, device):
     states, actions, rewards, next_states, dones = [], [], [], [], []
+    tree_size = len(tree_edges)
 
-    # randomly pop indices and remove edges from the tree list
-    random_indices = np.random.choice(a=range(0, len(tree_edges)), size=batch_size, replace=False)
-    
-    poped_edges = np.take(a=tree_edges, indices=random_indices, axis=0)
-    # TODO: check original TER paper whether to remove edges from the tree list or not
-    tree_edges = np.delete(arr=tree_edges, obj=random_indices, axis=0)
+    # number of samples must be included in each batch of transitions
+    n_fixed_index = 3
+
+    if tree_size < (batch_size - n_fixed_index):
+        is_replace = True
+    else:
+        is_replace = False
+
+    # first samples are corresponding to transitions with reward due to breadth-first-search algorithm
+    fixed_indices = np.random.choice(a=range(0, n_fixed_index), size=n_fixed_index, replace=is_replace)
+
+    # randomly sample transitions from the tree list
+    random_indices = np.random.choice(range(n_fixed_index, tree_size), size=(batch_size - n_fixed_index), replace=is_replace)
+
+    selected_indices = np.concatenate((fixed_indices, random_indices))
+    np.random.shuffle(selected_indices)
+
+    # get edges (current state hash, next state hash) from the tree list
+    poped_edges = np.take(a=tree_edges, indices=selected_indices, axis=0)
 
     # as each edge stores a value of transition, look up to hash-table
     for edge in poped_edges:
+
         current_state_hash = edge[0]
         next_state_hash = edge[1]
 
         # transition of this edge is stored within the current state hash
-        flatten_state, transition = hash_table.get_with_key(hash_key=current_state_hash)
+        transition = hash_table[current_state_hash]
 
         states.append(transition['state'])
         actions.append(transition['action'])
@@ -98,4 +116,4 @@ def sample_from_bfs(tree_edges, hash_table, batch_size, device):
     next_states = torch.from_numpy(np.array(next_states)).float().to(device)
     dones = torch.from_numpy(np.reshape(dones, (len(dones), 1))).float().to(device)
 
-    return tree_edges, (states, actions, rewards, next_states, dones)
+    return (states, actions, rewards, next_states, dones)

@@ -12,6 +12,7 @@ import gym_minigrid
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from hash_table import HashTable
+from utils import state2hash
 from construct_graph import plot_graph
 from sklearn.decomposition import PCA
 
@@ -130,7 +131,7 @@ if __name__ == "__main__":
             terminal_state = state
 
             # apply reverse breadth-first-search and create an oriented tree
-            bfs = networkx.bfs_tree(G=graph, source=hash(tuple(terminal_state)), reverse=True)
+            bfs = networkx.bfs_tree(G=graph, source=state2hash(terminal_state), reverse=True)
             bfs_trees.append(bfs)
 
         # concatenate states in one transition; used to differentiate different edges NOTE: check usage
@@ -140,7 +141,7 @@ if __name__ == "__main__":
         table[tuple(state)] = transition
 
         # graph.add_edge(idx, idx + 1)#, weight=reward)
-        graph.add_edge(hash(tuple(state)), hash(tuple(next_state)))
+        graph.add_edge(state2hash(state), state2hash(next_state))
 
     all_states = np.array(all_states)
     all_rewards = np.reshape(all_rewards, (len(all_rewards), 1))
@@ -194,8 +195,8 @@ if __name__ == "__main__":
             
             pca_table[tuple(in_node)] = node_info
         
-        source_node = hash(tuple(state.flatten()))
-        target_node = hash(tuple(next_state.flatten()))
+        source_node = state2hash(state.flatten())
+        target_node = state2hash(next_state.flatten())
 
         if len(graph.get_edge_data(source_node, target_node)) == 0 or graph[source_node][target_node]['weight'] > weight:
             graph[source_node][target_node]['weight'] = weight
@@ -204,7 +205,7 @@ if __name__ == "__main__":
 
     plot_graph(graph)
 
-    short_path = networkx.dijkstra_path(G=graph, source=hash(tuple(terminal_state)), target=None, weight='weight')
+    short_path = networkx.dijkstra_path(G=graph, source=state2hash(terminal_state), target=None, weight='weight')
 
     print("short_path : ", short_path)
 

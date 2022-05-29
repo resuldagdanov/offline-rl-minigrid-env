@@ -3,7 +3,7 @@ import utils
 import numpy as np
 import matplotlib.pyplot as plt
 from hash_table import HashTable
-from utils import sample_from_bfs
+from utils import sample_from_bfs, state2hash
 
 
 def build_graph(graph, buffer_data, table):
@@ -18,24 +18,26 @@ def build_graph(graph, buffer_data, table):
         reward = transition['reward']
         done = transition['done']
 
-        # store the terminal state so that from there, start bfs algorithm
-        if done:
-            terminal_state = state
-
-            # apply reverse breadth-first-search and create an oriented tree
-            bfs = networkx.bfs_tree(G=graph, source=hash(tuple(terminal_state)), reverse=True)
-            trees.append(bfs)
-
-        # concatenate states in one transition; used to differentiate different edges NOTE: check usage
+        # concatenate states in one transition; used to differentiate different edges
+        # NOTE: check usage to be representative of the graph
         current_next = np.concatenate((state, next_state))
 
         # store transition inside the table
         table[tuple(state)] = transition
 
-        # graph.add_edge(idx, idx + 1)#, weight=reward)
-        graph.add_edge(hash(tuple(state)), hash(tuple(next_state)))
+        # create an edge from the current state and the next state
+        graph.add_edge(state2hash(state), state2hash(next_state))
 
-    return graph, trees
+        # store the terminal state so that from there, start bfs algorithm
+        if reward:
+            terminal_state = state
+
+            # apply reverse breadth-first-search and create an oriented tree
+            bfs = networkx.bfs_tree(G=graph, source=state2hash(terminal_state), reverse=True)
+            trees.append(bfs)
+
+    # returning last bfs tree as this tree will contain all samples from other trees
+    return graph, trees[-1], table
 
 
 def plot_graph(G):
