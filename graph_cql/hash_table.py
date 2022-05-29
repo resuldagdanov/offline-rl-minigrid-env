@@ -1,4 +1,5 @@
 import copy
+import random
 import numpy as np
 
 
@@ -70,8 +71,10 @@ class HashTable(object):
 
             # buffer has all transitions for the current state, pop each consecutive transition for the current state
             else:
+                poping_id = random.randint(1, len(self.buffer[index_key][0]) - 1)
+
                 # randomly pop indices and remove edges from the tree list
-                selected_transition = self.buffer[index_key][0].pop(1)
+                selected_transition = self.buffer[index_key][0].pop(poping_id)
             
             return selected_transition
     
