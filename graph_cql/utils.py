@@ -1,10 +1,11 @@
 import argparse
-import numpy as np
 import random
 import torch
+import numpy as np
 import gym
 import pickle
 import networkx
+import torch.nn.functional as F
 
 
 def create_config():
@@ -35,7 +36,6 @@ def collect_transitions(env, dataset, experience, num_steps):
     
         if done:
             state = env.reset()
-    
     return dataset
 
 
@@ -51,7 +51,6 @@ def make_environment(config):
     
     env.seed(config.seed)
     env.action_space.seed(config.seed)
-
     return env
 
 
@@ -70,57 +69,68 @@ def state2hash(state):
     return hash(tuple(state))
 
 
-def sample_from_bfs(tree_edges, hash_table, batch_size, device, current_network, target_network, compute_td_loss):
+def construct_transition(graph, hash_table, edges):
     states, actions, rewards, next_states, dones = [], [], [], [], []
-    tree_size = len(tree_edges)
-
-    # number of samples must be included in each batch of transitions
-    n_fixed_index = 3
-
-    if tree_size < (batch_size - n_fixed_index):
-        is_replace = True
-    else:
-        is_replace = False
-
-    # first samples are corresponding to transitions with reward due to breadth-first-search algorithm
-    fixed_indices = np.random.choice(a=range(0, n_fixed_index), size=n_fixed_index, replace=is_replace)
-
-    # randomly sample transitions from the tree list
-    random_indices = np.random.choice(range(n_fixed_index, tree_size), size=(batch_size - n_fixed_index), replace=is_replace)
-
-    selected_indices = np.concatenate((fixed_indices, random_indices))
-    np.random.shuffle(selected_indices)
-
-    # get edges (current state hash, next state hash) from the tree list
-    poped_edges = np.take(a=tree_edges, indices=selected_indices, axis=0)
-
-    # as each edge stores a value of transition, look up to hash-table
-    for edge in poped_edges:
-
+    
+    for edge in edges:
         current_state_hash = edge[0]
         next_state_hash = edge[1]
 
-        # transition of this edge is stored within the current state hash
-        transition = hash_table[current_state_hash, current_network, target_network, compute_td_loss]
-
-        # states.append(transition['state'])
-        # actions.append(transition['action'])
-        # rewards.append(transition['reward'])
-        # next_states.append(transition['next_state'])
-        # dones.append(transition['done'])
-
-        states.append(transition.state)
-        actions.append(transition.action)
-        rewards.append(transition.reward)
-        next_states.append(transition.next_state)
-        dones.append(transition.done)
+        # re-construct transition
+        states.append(hash_table[current_state_hash])
+        next_states.append(hash_table[next_state_hash])
+        actions.append(graph[current_state_hash][next_state_hash]['action'])
+        rewards.append(graph[current_state_hash][next_state_hash]['reward'])
+        dones.append(graph[current_state_hash][next_state_hash]['done'])
     
-    # convert lists of batch samples to torch device tensor
+    return (states, actions, rewards, next_states, dones)
+
+
+def convert_to_torch(states, actions, rewards, next_states, dones, device):
     states = torch.from_numpy(np.array(states)).float().to(device)
     actions = torch.from_numpy(np.array(actions)).float().to(device)
     actions = actions.type(torch.int64).unsqueeze(1)
     rewards = torch.from_numpy(np.reshape(rewards, (len(rewards), 1))).float().to(device)
     next_states = torch.from_numpy(np.array(next_states)).float().to(device)
     dones = torch.from_numpy(np.reshape(dones, (len(dones), 1))).float().to(device)
+    return states, actions, rewards, next_states, dones
 
-    return (states, actions, rewards, next_states, dones)
+
+def compute_td_errors(agent, transition):
+    states, actions, rewards, next_states, dones = transition
+
+    with torch.no_grad():
+        Q_targets_next = agent.target_net(next_states).detach().max(1)[0].unsqueeze(1)
+        Q_targets = rewards + (agent.gamma * Q_targets_next * (1 - dones))
+    
+    Q_a_s = agent.network(states)
+    Q_expected = Q_a_s.gather(1, actions)
+    
+    # td_error = F.mse_loss(Q_expected, Q_targets)
+    td_errors = abs(Q_expected - Q_targets) ** 2
+    
+    return td_errors.detach().cpu().numpy()
+
+
+def update_edge_weights(graph, edges, hash_table, agent, device):
+    # re-construct transition from the given edges
+    transition = construct_transition(graph=graph, hash_table=hash_table, edges=edges)
+
+    # compute td errors of all transitions
+    td_errors = compute_td_errors(agent=agent, transition=convert_to_torch(*transition, device=device))
+
+    for idx, edge in enumerate(edges):
+        graph[edge[0]][edge[1]]['weight'] = float(td_errors[idx])
+
+
+def sample_with_random_walk(graph, hash_table, batch_size, device):
+    # run betweenness centrality on the graph and retrun edges
+    walker_edges = networkx.edge_current_flow_betweenness_centrality(G=graph, normalized=True, weight='weight')
+
+    # list of random walked edges
+    selected_edges = list(walker_edges.keys())
+
+    # re-construct transition from the given popped edges
+    transition = construct_transition(graph=graph, hash_table=hash_table, edges=selected_edges[:batch_size])
+    
+    return convert_to_torch(*transition, device=device)
