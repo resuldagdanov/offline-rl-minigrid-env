@@ -20,11 +20,6 @@ class HashTable(object):
         # get the index of our array for a specific string key
         return hash_key % len(self.buffer)
     
-    def get_with_key(self, hash_key: int) -> np.ndarray:
-        # queue transition when hash key is given
-        index = hash_key % len(self.buffer)
-        return self.buffer[index][0][0], self.buffer[index][0][1]
-    
     def add(self, hash_key: int, state: np.ndarray) -> None:
         # add a value to our array by its key
         index_key = self.hash_index(hash_key=hash_key)
