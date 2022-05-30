@@ -4,6 +4,7 @@ import random
 import torch
 import gym
 import pickle
+import networkx
 
 
 def create_config():
@@ -69,7 +70,7 @@ def state2hash(state):
     return hash(tuple(state))
 
 
-def sample_from_bfs(tree_edges, hash_table, batch_size, device):
+def sample_from_bfs(tree_edges, hash_table, batch_size, device, current_network, target_network, compute_td_loss):
     states, actions, rewards, next_states, dones = [], [], [], [], []
     tree_size = len(tree_edges)
 
@@ -100,13 +101,19 @@ def sample_from_bfs(tree_edges, hash_table, batch_size, device):
         next_state_hash = edge[1]
 
         # transition of this edge is stored within the current state hash
-        transition = hash_table[current_state_hash]
+        transition = hash_table[current_state_hash, current_network, target_network, compute_td_loss]
 
-        states.append(transition['state'])
-        actions.append(transition['action'])
-        rewards.append(transition['reward'])
-        next_states.append(transition['next_state'])
-        dones.append(transition['done'])
+        # states.append(transition['state'])
+        # actions.append(transition['action'])
+        # rewards.append(transition['reward'])
+        # next_states.append(transition['next_state'])
+        # dones.append(transition['done'])
+
+        states.append(transition.state)
+        actions.append(transition.action)
+        rewards.append(transition.reward)
+        next_states.append(transition.next_state)
+        dones.append(transition.done)
     
     # convert lists of batch samples to torch device tensor
     states = torch.from_numpy(np.array(states)).float().to(device)

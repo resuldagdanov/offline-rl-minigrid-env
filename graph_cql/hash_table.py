@@ -1,6 +1,7 @@
 import copy
 import random
 import numpy as np
+import torch
 
 
 class HashTable(object):
@@ -10,14 +11,18 @@ class HashTable(object):
         self.buffer = [None] * buffer_size
         self.copied_buffer = [None] * buffer_size
 
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
     def __setitem__(self, state: tuple, transition: np.ndarray) -> None:
         # state: flattened state tuple
         # transition: numpy array of (state, action, next_state, reward, terminal)
         self.add(state, transition)
     
-    def __getitem__(self, state: tuple) -> np.ndarray:
+    def __getitem__(self, values: tuple) -> np.ndarray:
         # retreats transition of this state hash key
-        return self.get(state)
+        state, current_network, target_network , compute_td_error= values
+        # return self.get(state)
+        return self.get_with_prob(state, current_network, target_network, compute_td_error)
     
     def hashing(self, state: tuple) -> int:
         # get the index of our array for a specific string key
@@ -28,7 +33,7 @@ class HashTable(object):
         index = hash_key % len(self.buffer)
         return self.buffer[index][0][0], self.buffer[index][0][1]
     
-    def add(self, state: tuple, transition: np.ndarray) -> None:
+    def add(self, state: tuple, transition) -> None:
         # add a value to our array by its key
         index_key = self.hashing(state=state)
 
@@ -78,6 +83,62 @@ class HashTable(object):
             
             return selected_transition
     
+    def get_with_prob(self, hash_key: int, current_network, target_network, compute_td_loss) -> np.ndarray:
+        # get a value by key index
+        index_key = hash_key % len(self.buffer)
+
+        if self.buffer[index_key] is None:
+            # this state is not previously stored
+            raise KeyError()
+        
+        else:
+            # return all transitions that has the same current state as the key
+            if len(self.buffer[index_key][0]) == 2:
+                selected_transition = self.buffer[index_key][0][1]
+
+                # re-fill the buffer with the copied buffer for the corresponding state transitions
+                self.buffer[index_key] = copy.deepcopy(self.copied_buffer[index_key])
+
+            # buffer has all transitions for the current state, pop each consecutive transition for the current state
+            else:
+                td_errors = []
+
+                # return all transitions that has the same current state as the key
+                all_transitions = self.buffer[index_key][0][1:]
+
+                states = torch.from_numpy(np.stack([e.state for e in all_transitions if e is not None])).float().to(self.device)
+                actions = torch.from_numpy(np.vstack([e.action for e in all_transitions if e is not None])).long().to(self.device)
+                rewards = torch.from_numpy(np.vstack([e.reward for e in all_transitions if e is not None])).float().to(self.device)
+                next_states = torch.from_numpy(np.stack([e.next_state for e in all_transitions if e is not None])).float().to(self.device)
+                dones = torch.from_numpy(np.vstack([e.done for e in all_transitions if e is not None]).astype(np.uint8)).float().to(self.device)
+
+                all_transitions = (states, actions, rewards, next_states, dones)
+
+                # calculate td error with the given q value functions for corresponding states' transitions
+                td_errors = compute_td_loss(current_network, target_network, all_transitions)
+
+                # filter out negative td-losses
+                td_errors[td_errors < 0.0] = 0.0
+
+                td_errors = td_errors.detach().cpu().numpy()
+                td_errors = np.reshape(td_errors, (len(td_errors)))
+
+                # calculate probability distribution of td-errors
+                probs = td_errors / sum(td_errors)
+
+                # buffer has all transitions for the current state, pop with td_error probability
+                #poping_id = np.random.choice(range(1, len(self.buffer[index_key][0])), p=probs)
+                
+                poping_id = int(np.argmin(td_errors, axis=0)) + 1
+                # poping_id = random.randint(1, len(self.buffer[index_key][0]) - 1)
+
+                #print("poping_id : ", type(poping_id), type(np.argmax(td_errors, axis=0)), poping_id, np.argmax(td_errors, axis=0))
+
+                # randomly pop indices and remove edges from the tree list
+                selected_transition = self.buffer[index_key][0].pop(poping_id)
+                
+            return selected_transition
+
     def is_full(self) -> bool:
         # determines if the hash-table is too populated
         items = 0

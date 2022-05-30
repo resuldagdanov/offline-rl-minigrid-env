@@ -10,6 +10,7 @@ import torch
 import argparse
 import utils
 import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
 from collections import deque
 from construct_graph import build_graph
 from hash_table import HashTable
@@ -87,6 +88,29 @@ def pca_stacked_features(futures_matrix, n_components):
     return embeddings
 
 
+def compute_td_loss(network, target_net, transitions):
+    gamma = 0.99
+
+    states, actions, rewards, next_states, dones = transitions
+
+    with torch.no_grad():
+        Q_targets_next = target_net(next_states).detach().max(1)[0].unsqueeze(1)
+        Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
+    
+    Q_a_s = network(states)
+    Q_expected = Q_a_s.gather(1, actions)
+
+    # print("Q_a_s : ", Q_a_s.shape)
+    # print("Q_expected : ", Q_expected.shape)
+    # print("Q_targets : " , Q_targets.shape)
+
+    # bellmann_error = F.mse_loss(Q_expected, Q_targets)
+
+    mse_loss_tensor = abs(Q_expected - Q_targets) ** 2
+
+    return mse_loss_tensor
+
+
 def compute_td_error(current_network, target_network, transition):
     gamma = 0.99
     states, actions, rewards, next_states, dones = transition['state'], transition['action'], transition['reward'], transition['next_state'], transition['done']
@@ -160,7 +184,8 @@ def train(bfs_tree):
             next_state, reward, done, _ = env.step(action[0])
             
             # randomly pop transitions from graph and remove it from tree
-            batch_transitions = utils.sample_from_bfs(tree_edges=tree_edges, hash_table=table, batch_size=config.batch_size, device=device)
+            batch_transitions = utils.sample_from_bfs(
+                tree_edges=tree_edges, hash_table=table, batch_size=config.batch_size, device=device, current_network=agent.network, target_network=agent.target_net, compute_td_loss=compute_td_loss)
 
             loss, cql_loss, bellmann_error = agent.learn(batch_transitions)
 
@@ -203,6 +228,9 @@ def train(bfs_tree):
         
         average10.append(rewards)
         total_steps += episode_steps
+
+        writer.add_scalar("Weighted-BFS-CQL-episode-reward", rewards, i)
+        writer.add_scalar("Weighted-BFS-CQL-steps-reward", rewards, total_steps)
         
         print("Episode: {} | Reward: {} | Q Loss: {} | CQL Loss: {} | Bellman Error: {} | Steps: {} | Epsilon: {}".format(i, rewards, loss, cql_loss, bellmann_error, steps, eps))
 
@@ -217,6 +245,9 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    # initialize tensorboard logging directory
+    writer = SummaryWriter(log_dir="runs/")
+
     # replay buffer graph
     graph = networkx.Graph()
 
@@ -224,7 +255,7 @@ if __name__ == "__main__":
     replay_buffer = utils.open_dataset()
 
     # get pca component 1 from states
-    states_component, reward_samples = states_2_pca(dataset=replay_buffer, n_components=1)
+    #states_component, reward_samples = states_2_pca(dataset=replay_buffer, n_components=1)
 
     # hash-table to represent states in hash integer
     table = HashTable(buffer_size=len(replay_buffer))

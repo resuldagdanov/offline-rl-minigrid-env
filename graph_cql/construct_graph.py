@@ -4,11 +4,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from hash_table import HashTable
 from utils import sample_from_bfs, state2hash
+from collections import namedtuple
 
 
 def build_graph(graph, buffer_data, table):
     # breadth-first-search trees
     trees = []
+
+    experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
 
     # loop through each transition and store in the graph
     for idx, transition in enumerate(buffer_data):
@@ -22,8 +25,11 @@ def build_graph(graph, buffer_data, table):
         # NOTE: check usage to be representative of the graph
         current_next = np.concatenate((state, next_state))
 
+        replay_transiiton = experience(
+            transition['state'], transition['action'], transition['reward'], transition['next_state'], transition['done'])
+
         # store transition inside the table
-        table[tuple(state)] = transition
+        table[tuple(state)] = replay_transiiton
 
         # create an edge from the current state and the next state
         graph.add_edge(state2hash(state), state2hash(next_state))
