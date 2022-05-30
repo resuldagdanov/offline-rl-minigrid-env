@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import argparse
 import utils
+from torch.utils.tensorboard import SummaryWriter
 from collections import deque
 from construct_graph import build_graph
 from hash_table import HashTable
@@ -103,6 +104,9 @@ def train(bfs_tree):
         
         average10.append(rewards)
         total_steps += episode_steps
+
+        writer.add_scalar("BFS-CQL-episode-reward", rewards, i)
+        writer.add_scalar("BFS-CQL-steps-reward", rewards, total_steps)
         
         print("Episode: {} | Reward: {} | Q Loss: {} | CQL Loss: {} | Bellman Error: {} | Steps: {} | Epsilon: {}".format(i, rewards, loss, cql_loss, bellmann_error, steps, eps))
 
@@ -116,6 +120,9 @@ if __name__ == "__main__":
     config = get_config()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # initialize tensorboard logging directory
+    writer = SummaryWriter(log_dir="runs/")
 
     # replay buffer graph
     graph = networkx.Graph()

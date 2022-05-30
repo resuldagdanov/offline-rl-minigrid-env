@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import wandb
 import argparse
+from torch.utils.tensorboard import SummaryWriter
 from collections import deque
 from replay_buffer import ReplayBuffer
 from cql_agent import CQLAgent
@@ -17,7 +18,7 @@ def get_config():
 
     parser.add_argument("--run_name", type=str, default="cql-dqn", help="Run name, default: CQL-DQN")
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="Gym environment name, default: CartPole-v0")
-    parser.add_argument("--episodes", type=int, default=300, help="Number of episodes, default: 200")
+    parser.add_argument("--episodes", type=int, default=600, help="Number of episodes, default: 200")
     parser.add_argument("--buffer_size", type=int, default=10_000, help="Maximal training dataset size, default: 100_000")
     parser.add_argument("--batch_size", type=int, default=32, help="Mini batch size, default: 32")
     parser.add_argument("--num_samples", type=int, default=10_000, help="Number of samples to collect, default: 100_000")
@@ -120,6 +121,9 @@ def train(config):
             
             average10.append(rewards)
             total_steps += episode_steps
+
+            writer.add_scalar("Vanilla-CQL-episode-reward", rewards, i)
+            writer.add_scalar("Vanilla-CQL-steps-reward", rewards, total_steps)
             
             print("Episode: {} | Reward: {} | Q Loss: {} | Steps: {} | Epsilon: {}".format(i, rewards, loss, steps, eps))
             
@@ -146,5 +150,8 @@ def train(config):
 
 if __name__ == "__main__":
     config = get_config()
+
+    # initialize tensorboard logging directory
+    writer = SummaryWriter(log_dir="runs/")
 
     train(config)
