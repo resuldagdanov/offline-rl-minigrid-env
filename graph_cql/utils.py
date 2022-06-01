@@ -18,6 +18,7 @@ def create_config():
     parser.add_argument("--is_render", type=int, default=0, help="Render environment during training when set to 1, default: 0")
     
     args = parser.parse_args()
+
     return args
 
 
@@ -36,6 +37,7 @@ def collect_transitions(env, dataset, experience, num_steps):
     
         if done:
             state = env.reset()
+
     return dataset
 
 
@@ -51,6 +53,7 @@ def make_environment(config):
     
     env.seed(config.seed)
     env.action_space.seed(config.seed)
+
     return env
 
 
@@ -62,10 +65,12 @@ def save_dataset(data):
 def open_dataset():
     with open('dataset.pkl', 'rb') as file:
         data = pickle.load(file)
+
     return data
 
 
 def state2hash(state):
+
     return hash(tuple(state))
 
 
@@ -93,6 +98,7 @@ def convert_to_torch(states, actions, rewards, next_states, dones, device):
     rewards = torch.from_numpy(np.reshape(rewards, (len(rewards), 1))).float().to(device)
     next_states = torch.from_numpy(np.array(next_states)).float().to(device)
     dones = torch.from_numpy(np.reshape(dones, (len(dones), 1))).float().to(device)
+
     return states, actions, rewards, next_states, dones
 
 
@@ -119,18 +125,56 @@ def update_edge_weights(graph, edges, hash_table, agent, device):
     # compute td errors of all transitions
     td_errors = compute_td_errors(agent=agent, transition=convert_to_torch(*transition, device=device))
 
+    # filter out negative td errors
+    #td_errors[td_errors < 0] = 0.0
+
     for idx, edge in enumerate(edges):
-        graph[edge[0]][edge[1]]['weight'] = float(td_errors[idx])
+        graph[edge[0]][edge[1]]['weight'] = 1 / (float(abs(td_errors[idx])) + 1e-5)
 
 
-def sample_with_random_walk(graph, hash_table, batch_size, device):
+def sample_with_random_walk(graph, hash_table, batch_size, seed, device):
     # run betweenness centrality on the graph and retrun edges
-    walker_edges = networkx.edge_current_flow_betweenness_centrality(G=graph, normalized=True, weight='weight')
+    walker_edges = networkx.edge_betweenness_centrality(G=graph, normalized=True, weight='weight', seed=seed)
+    # tree_edges = networkx.minimum_spanning_edges(G=graph, algorithm='kruskal', weight='weight', data=True)
 
     # list of random walked edges
-    selected_edges = list(walker_edges.keys())
+    selected_edges = list(walker_edges.keys())# [batch_size:]
+    # selected_edges = random.sample(selected_edges, batch_size)
+    # selected_edges = list(tree_edges)[:batch_size]
+
+    print("\n")
+    for i, edge in enumerate(selected_edges):
+        print(i, graph[edge[0]][edge[1]]['reward'], graph[edge[0]][edge[1]]['weight'])
+
+    print("walker_edges values : ", walker_edges.values())
 
     # re-construct transition from the given popped edges
-    transition = construct_transition(graph=graph, hash_table=hash_table, edges=selected_edges[:batch_size])
+    transition = construct_transition(graph=graph, hash_table=hash_table, edges=selected_edges)
+    
+    return convert_to_torch(*transition, device=device)
+
+
+def sample_with_tsp(graph, hash_table, batch_size, seed, device):
+
+    tsp = networkx.approximation.traveling_salesman_problem
+
+    path = tsp(graph, weight='weight')
+
+    print("path : ", path, len(path))
+
+    print(len([x for x in hash_table.buffer if x is not None]))
+
+    w_1 = graph[path[-1]][path[-2]]['weight']
+    w_2 = graph[path[1]][path[0]]['reward']
+
+    print(w_1, w_2)
+    
+    edges = graph.edges(data=True)
+
+    # list of random walked edges
+    selected_edges = list(tree_edges)[:batch_size]
+
+    # re-construct transition from the given popped edges
+    transition = construct_transition(graph=graph, hash_table=hash_table, edges=selected_edges)
     
     return convert_to_torch(*transition, device=device)

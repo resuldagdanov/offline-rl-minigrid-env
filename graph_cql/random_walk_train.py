@@ -7,12 +7,11 @@ import pybullet_envs
 import numpy as np
 import torch
 import argparse
-import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from collections import deque
 from construct_graph import build_graph
 from hash_table import HashTable
-from utils import open_dataset, make_environment, state2hash, update_edge_weights, sample_with_random_walk
+from utils import open_dataset, make_environment, update_edge_weights, sample_with_random_walk, sample_with_tsp
 
 # to add the parent "agents" folder to sys path and import models
 current = os.path.dirname(os.path.realpath(__file__))
@@ -70,7 +69,8 @@ def train(graph, table):
             update_edge_weights(graph=graph, edges=graph_edges, hash_table=table, agent=agent, device=device)
             
             # randomly pop transitions from graph with random-walk
-            batch_transitions = sample_with_random_walk(graph=graph, hash_table=table, batch_size=config.batch_size, device=device)
+            batch_transitions = sample_with_random_walk(graph=graph, hash_table=table, batch_size=config.batch_size, seed=config.seed, device=device)
+            # batch_transitions = sample_with_tsp(graph=graph, hash_table=table, batch_size=config.batch_size, seed=config.seed, device=device)
 
             # update the parameters of the network
             loss, cql_loss, bellmann_error = agent.learn(batch_transitions)
