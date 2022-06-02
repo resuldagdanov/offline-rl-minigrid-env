@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 from collections import deque
 from construct_graph import build_graph
 from hash_table import HashTable
-from utils import open_dataset, make_environment, update_edge_weights, sample_with_random_walk, sample_with_tsp
+from utils import open_dataset, make_environment, update_edge_weights, sample_with_random_walk, sample_with_tsp, error_2_pca, sample_with_cluster
 
 # to add the parent "agents" folder to sys path and import models
 current = os.path.dirname(os.path.realpath(__file__))
@@ -66,11 +66,12 @@ def train(graph, table):
 
             # TODO: update weight at each x steps
             # update weight of the edges in the graph with td-error
-            update_edge_weights(graph=graph, edges=graph_edges, hash_table=table, agent=agent, device=device)
+            #weights = update_edge_weights(graph=graph, edges=graph_edges, hash_table=table, agent=agent, device=device)
             
             # randomly pop transitions from graph with random-walk
-            batch_transitions = sample_with_random_walk(graph=graph, hash_table=table, batch_size=config.batch_size, seed=config.seed, device=device)
+            # batch_transitions = sample_with_random_walk(graph=graph, hash_table=table, batch_size=config.batch_size, seed=config.seed, device=device)
             # batch_transitions = sample_with_tsp(graph=graph, hash_table=table, batch_size=config.batch_size, seed=config.seed, device=device)
+            batch_transitions = sample_with_cluster(weights=None, edges=graph_edges, n_clusters=config.batch_size, hash_table=table, graph=graph, device=device)
 
             # update the parameters of the network
             loss, cql_loss, bellmann_error = agent.learn(batch_transitions)
@@ -134,3 +135,14 @@ if __name__ == "__main__":
     table.save_buffer()
 
     train(graph, table)
+
+    # -------------------------------------------------------------
+
+    # graph_edges = graph.edges()
+
+    # weights = update_edge_weights(graph=graph, edges=graph_edges, hash_table=table, agent=agent, device=device)
+
+    # print("weights : ", weights)
+
+    # # error_2_pca(weights=weights, n_components=1)
+    # sample_with_cluster(weights=weights, n_clusters=config.batch_size)

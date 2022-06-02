@@ -4,8 +4,13 @@ import torch
 import numpy as np
 import gym
 import pickle
+import ckwrap
 import networkx
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.cluster import MeanShift
+
 
 
 def create_config():
@@ -128,8 +133,14 @@ def update_edge_weights(graph, edges, hash_table, agent, device):
     # filter out negative td errors
     #td_errors[td_errors < 0] = 0.0
 
+    weights = []
+
     for idx, edge in enumerate(edges):
-        graph[edge[0]][edge[1]]['weight'] = 1 / (float(abs(td_errors[idx])) + 1e-5)
+        weight = 1 / (float(abs(td_errors[idx])) + 1e-5)
+        graph[edge[0]][edge[1]]['weight'] = weight
+        weights.append(weight)
+    
+    return weights
 
 
 def sample_with_random_walk(graph, hash_table, batch_size, seed, device):
@@ -175,6 +186,70 @@ def sample_with_tsp(graph, hash_table, batch_size, seed, device):
     selected_edges = list(tree_edges)[:batch_size]
 
     # re-construct transition from the given popped edges
+    transition = construct_transition(graph=graph, hash_table=hash_table, edges=selected_edges)
+    
+    return convert_to_torch(*transition, device=device)
+
+
+def error_2_pca(weights, n_components):
+
+    weight_pca = PCA(n_components=n_components)
+    pca_data = weight_pca.fit_transform(np.array(weights).reshape(-1, 1))
+
+    print("pca_data : ", pca_data.flatten())
+
+    y_values = pca_data.flatten()
+    x_values = range(0, pca_data.shape[0])
+
+    # model = MeanShift()
+
+    # y_hat = model.fit_predict(y_values)
+
+    y_hat = ckwrap.ckmeans(y_values, 32)
+
+    we_y_hat = ckwrap.ckmeans(weights, 32)
+
+    print("y_hat : ", y_hat, y_hat.labels)
+    print("we_y_hat : ", we_y_hat, we_y_hat.labels)
+
+    print(np.random.choice(np.where(y_hat.labels == 1)[0]))
+
+    clusters = np.unique(y_hat)
+
+    print("clusters : ", clusters)
+
+    # for cluster in clusters:
+    #     # get row indexes for samples with this cluster
+    #     row_ix = np.where(y_hat == cluster)
+    #     # create scatter of these samples
+    #     plt.scatter(y_values[row_ix, 0], y_values[row_ix, 1])
+    # # show the plot
+    # plt.show()
+
+    # plt.scatter(x_values, y_values, alpha=0.5)
+    # plt.show()
+
+
+def sample_with_cluster(weights, edges, n_clusters, hash_table, graph, device):
+    batch = []
+
+    if weights is not None:
+
+        clustered_data = ckwrap.ckmeans(weights, n_clusters)
+        labels = clustered_data.labels
+
+        for i in range(n_clusters):
+            indices = np.where(labels == i)[0]
+            select = np.random.choice(indices, 1)
+
+            batch.append(int(select))
+        
+    # print("batch : ", list(batch))
+
+    select = np.random.choice(range(0, 32), n_clusters)
+
+    selected_edges = np.take(edges, select, axis=0).reshape(n_clusters, 2)
+
     transition = construct_transition(graph=graph, hash_table=hash_table, edges=selected_edges)
     
     return convert_to_torch(*transition, device=device)
