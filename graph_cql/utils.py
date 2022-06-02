@@ -74,7 +74,7 @@ def sample_from_bfs(tree_edges, hash_table, batch_size, device):
     tree_size = len(tree_edges)
 
     # number of samples must be included in each batch of transitions
-    n_fixed_index = 3
+    n_fixed_index = 1
 
     if tree_size < (batch_size - n_fixed_index):
         is_replace = True
@@ -116,4 +116,107 @@ def sample_from_bfs(tree_edges, hash_table, batch_size, device):
     next_states = torch.from_numpy(np.array(next_states)).float().to(device)
     dones = torch.from_numpy(np.reshape(dones, (len(dones), 1))).float().to(device)
 
+    return (states, actions, rewards, next_states, dones)
+
+
+def construct_transition(graph, hash_table, edges):
+    states, actions, rewards, next_states, dones = [], [], [], [], []
+    
+    for edge in edges:
+        current_state_hash = edge[0]
+        next_state_hash = edge[1]
+
+        # re-construct transition
+        states.append(hash_table[current_state_hash])
+        next_states.append(hash_table[next_state_hash])
+        actions.append(graph[current_state_hash][next_state_hash]['action'])
+        rewards.append(graph[current_state_hash][next_state_hash]['reward'])
+        dones.append(graph[current_state_hash][next_state_hash]['done'])
+    
+    return (states, actions, rewards, next_states, dones)
+
+
+def convert_to_torch(states, actions, rewards, next_states, dones, device):
+    states = torch.from_numpy(np.array(states)).float().to(device)
+    actions = torch.from_numpy(np.array(actions)).float().to(device)
+    actions = actions.type(torch.int64).unsqueeze(1)
+    rewards = torch.from_numpy(np.reshape(rewards, (len(rewards), 1))).float().to(device)
+    next_states = torch.from_numpy(np.array(next_states)).float().to(device)
+    dones = torch.from_numpy(np.reshape(dones, (len(dones), 1))).float().to(device)
+
+    return states, actions, rewards, next_states, dones
+
+
+def compute_td_errors(agent, transition):
+    states, actions, rewards, next_states, dones = transition
+
+    with torch.no_grad():
+        Q_targets_next = agent.target_net(next_states).detach().max(1)[0].unsqueeze(1)
+        Q_targets = rewards + (agent.gamma * Q_targets_next * (1 - dones))
+    
+    Q_a_s = agent.network(states)
+    Q_expected = Q_a_s.gather(1, actions)
+    
+    # td_error = F.mse_loss(Q_expected, Q_targets)
+    td_errors = abs(Q_expected - Q_targets) ** 2
+    
+    return td_errors.detach().cpu().numpy()
+
+
+def update_weights(graph, edges, hash_table, agent, device):
+    # re-construct transition from the given edges
+    transition = construct_transition(graph=graph, hash_table=hash_table, edges=edges)
+
+    # compute td errors of all transitions
+    td_errors = compute_td_errors(agent=agent, transition=convert_to_torch(*transition, device=device))
+
+    for idx, edge in enumerate(edges):
+        graph[edge[0]][edge[1]]['weight'] = 1 / (float(abs(td_errors[idx])) + 1e-5)
+
+
+def weighted_sample(current_state_hash, hash_table, agent, batch_size, device):
+    selected_transitions = []
+
+    for idx in range(batch_size):
+        transitions = hash_table[current_state_hash]
+
+        states, actions, rewards, next_states, dones = [], [], [], [], []
+        for transition in transitions:
+            states.append(transition['state'])
+            actions.append(transition['action'])
+            rewards.append(transition['reward'])
+            next_states.append(transition['next_state'])
+            dones.append(transition['done'])
+
+        transitions = convert_to_torch(states, actions, rewards, next_states, dones, device)
+
+        # compute td errors of all transitions
+        td_errors = compute_td_errors(agent=agent, transition=convert_to_torch(*transition, device=device))
+        td_errors = td_errors.detach().cpu().numpy() + 1e-5
+
+        probabilities = td_errors / np.sum(td_errors)
+
+        selected = np.random.choice(transitions, size=1, p=probabilities, replace=False)
+        selected_transitions.append(selected)
+
+        current_state_hash = selected['state']
+
+    np.random.shuffle(selected_transitions)
+
+    states, actions, rewards, next_states, dones = [], [], [], [], []
+    for trans in selected_transitions:
+
+        states.append(trans['state'])
+        actions.append(trans['action'])
+        rewards.append(trans['reward'])
+        next_states.append(trans['next_state'])
+        dones.append(trans['done'])
+    
+    states = torch.from_numpy(np.array(states)).float().to(device)
+    actions = torch.from_numpy(np.array(actions)).float().to(device)
+    actions = actions.type(torch.int64).unsqueeze(1)
+    rewards = torch.from_numpy(np.reshape(rewards, (len(rewards), 1))).float().to(device)
+    next_states = torch.from_numpy(np.array(next_states)).float().to(device)
+    dones = torch.from_numpy(np.reshape(dones, (len(dones), 1))).float().to(device)
+    
     return (states, actions, rewards, next_states, dones)

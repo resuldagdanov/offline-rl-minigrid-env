@@ -15,7 +15,7 @@ class HashTable(object):
         # transition: numpy array of (state, action, next_state, reward, terminal)
         self.add(state, transition)
     
-    def __getitem__(self, state: tuple) -> np.ndarray:
+    def __getitem__(self, state: tuple) -> list:
         # retreats transition of this state hash key
         return self.get(state)
     
@@ -53,7 +53,7 @@ class HashTable(object):
             self.buffer[index_key] = []
             self.buffer[index_key].append([state, transition])
 
-    def get(self, hash_key: int) -> np.ndarray:
+    def get(self, hash_key: int) -> list:
         # get a value by key index
         index_key = hash_key % len(self.buffer)
 
@@ -64,7 +64,8 @@ class HashTable(object):
         else:
             # return all transitions that has the same current state as the key
             if len(self.buffer[index_key][0]) == 2:
-                selected_transition = self.buffer[index_key][0][1]
+                # selected_transition = self.buffer[index_key][0][1]
+                selected_transition = [self.buffer[index_key][0][1]]
 
                 # re-fill the buffer with the copied buffer for the corresponding state transitions
                 self.buffer[index_key] = copy.deepcopy(self.copied_buffer[index_key])
@@ -74,7 +75,8 @@ class HashTable(object):
                 poping_id = random.randint(1, len(self.buffer[index_key][0]) - 1)
 
                 # randomly pop indices and remove edges from the tree list
-                selected_transition = self.buffer[index_key][0].pop(poping_id)
+                # selected_transition = self.buffer[index_key][0].pop(poping_id)
+                selected_transition = list(self.buffer[index_key][0][1:])
             
             return selected_transition
     

@@ -15,6 +15,7 @@ def build_graph(graph, buffer_data, table):
 
         state = transition['state'].flatten()
         next_state = transition['next_state'].flatten()
+        action = transition['action']
         reward = transition['reward']
         done = transition['done']
 
@@ -26,7 +27,7 @@ def build_graph(graph, buffer_data, table):
         table[tuple(state)] = transition
 
         # create an edge from the current state and the next state
-        graph.add_edge(state2hash(state), state2hash(next_state))
+        graph.add_edge(state2hash(state), state2hash(next_state), reward=reward, action=action, done=done, weight=1)
 
         # store the terminal state so that from there, start bfs algorithm
         if reward:
