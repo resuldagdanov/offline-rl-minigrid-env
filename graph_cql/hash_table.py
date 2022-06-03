@@ -21,8 +21,8 @@ class HashTable(object):
     def __getitem__(self, values: tuple) -> np.ndarray:
         # retreats transition of this state hash key
         state, current_network, target_network , compute_td_error= values
-        # return self.get(state)
-        return self.get_with_prob(state, current_network, target_network, compute_td_error)
+        return self.get(state)
+        # return self.get_with_prob(state, current_network, target_network, compute_td_error)
     
     def hashing(self, state: tuple) -> int:
         # get the index of our array for a specific string key
