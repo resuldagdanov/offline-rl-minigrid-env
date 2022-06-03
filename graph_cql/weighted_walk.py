@@ -158,11 +158,14 @@ def train(bfs_tree):
             steps += 1
 
             next_state, reward, done, _ = env.step(action[0])
-            
+
+            # select random state hash or maximum td-error state hash
+            rand_idx = random.randint(0, len(tree_edges) - 1)
+            # rand_idx = 0
+   
             # randomly pop transitions from graph and remove it from tree
             # batch_transitions = utils.sample_from_bfs(tree_edges=tree_edges, hash_table=table, batch_size=config.batch_size, device=device)
-            # TODO: select random state hash or maximum td-error state hash
-            batch_transitions = utils.weighted_sample(current_state_hash=tree_edges[0][0], hash_table=table, agent=agent, batch_size=config.batch_size, device=device)
+            batch_transitions = utils.weighted_sample(current_state_hash=list(tree_edges)[rand_idx][0], hash_table=table, agent=agent, batch_size=config.batch_size, device=device)
 
             loss, cql_loss, bellmann_error = agent.learn(batch_transitions)
 

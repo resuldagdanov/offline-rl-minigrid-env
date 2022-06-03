@@ -188,18 +188,22 @@ def weighted_sample(current_state_hash, hash_table, agent, batch_size, device):
             next_states.append(transition['next_state'])
             dones.append(transition['done'])
 
-        transitions = convert_to_torch(states, actions, rewards, next_states, dones, device)
+        torch_transitions = convert_to_torch(states, actions, rewards, next_states, dones, device)
 
         # compute td errors of all transitions
-        td_errors = compute_td_errors(agent=agent, transition=convert_to_torch(*transition, device=device))
-        td_errors = td_errors.detach().cpu().numpy() + 1e-5
+        td_errors = compute_td_errors(agent=agent, transition=torch_transitions)
+        td_errors = td_errors + 1e-5
 
         probabilities = td_errors / np.sum(td_errors)
 
-        selected = np.random.choice(transitions, size=1, p=probabilities, replace=False)
-        selected_transitions.append(selected)
+        # TODO: comment out following line
+        # selected = np.random.choice(transitions, size=1, replace=False)
+        selected = np.random.choice(transitions, size=1, p=probabilities.flatten(), replace=False)
+        selected_transitions.append(selected[0])
 
-        current_state_hash = selected['state']
+        current_state_hash = state2hash(selected_transitions[-1]['state'].flatten())
+
+        # NOTE: poping selected transition from list of transitions for corresponding state
 
     np.random.shuffle(selected_transitions)
 
